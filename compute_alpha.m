@@ -7,7 +7,7 @@ nfft = 512;
 source = source(:);
 
 num_samples = length(source) + size(h_single,1) - 1;
-x_hoa = zeros(num_samples, M, 'like', h_single); % x mantenere complesso
+x_hoa = zeros(num_samples, M);
 
 for j = 1:M
     x_hoa(:, j) = conv(source, h_single(:, j));
@@ -19,7 +19,8 @@ end
 % freq positive
 pos_idx = (F_full >= 0);
 F = F_full(pos_idx);
-
+disp(size(F_full))
+disp(size(F))
 alpha = zeros(length(F), length(T), M);
 alpha(:,:,1) = S_full(pos_idx, :);
 
