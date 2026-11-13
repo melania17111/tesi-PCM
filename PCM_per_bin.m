@@ -19,12 +19,14 @@
 
 % rows: N+1
 % columns: 2N+1
-% ultimo elemento diverso da zero: i+1
+
 function [S_hat, G_sym, G_norm, G_phase, G_tot, G_tot_glob] = PCM_per_bin(alpha, N_sup, eta)
     S = 0;
-    for k=1:N_sup+1
-        alpha_norm(k) = norm(alpha(k,:));
-        S(k) = alpha_norm(k)/sqrt(4*pi*(2*(k-1)+1));
+
+    for j=1:N_sup+1
+        n = j-1;
+        alpha_norm(j) = norm(alpha(j,:));
+        S(j) = alpha_norm(j)/sqrt(4*pi*(2*n+1));
     end
     S_hat_mod = min(S);
     
@@ -32,14 +34,15 @@ function [S_hat, G_sym, G_norm, G_phase, G_tot, G_tot_glob] = PCM_per_bin(alpha,
     w0 = 1;
     alpha_00 = alpha(1,1);
     phi_0_cand = angle(alpha_00);
-    delta   = zeros(1, N_sup+1);
-    w_n0        = zeros(1, N_sup+1);
+    delta_n0   = zeros(N_sup+1);
+    w_n0        = zeros(N_sup+1);
     
-    phi_n0_cand = zeros(1,N_sup+1);
+    phi_n0_cand = zeros(N_sup+1);
     phi_nm_cand = zeros(N_sup+1,2*N_sup+1);
     eps = 1e-12;
     
     w_nm = zeros(N_sup+1, 2*N_sup+1);
+
     
     for j=1:N_sup+1
         n=j-1; % ordine reale
@@ -49,17 +52,18 @@ function [S_hat, G_sym, G_norm, G_phase, G_tot, G_tot_glob] = PCM_per_bin(alpha,
         if abs(n1) > abs(n2)
             phi_n0_cand(j) = phi_n0_cand(j) + pi;
         end
-        delta(j) = min(abs(n1),abs(n2));
+        delta_n0(j) = min(abs(n1),abs(n2));
     
-        %reminder: coeff. (n,-m) is (j,j-k) and (n,m) is (j,j+k) ??in teoria??
-        for k = 1:n % qua non serve che parta da 0 perché gli n0 li ha già calcolati
-            rho_nm = conj(alpha(j,j-k))/((-1)^(n+k)*alpha(j,(j+k)) + eps);
+        %reminder: coeff. (n,-m) is (j,j-m) and (n,m) is (j,j+m) ??in teoria??
+        for k = 1:j % qua non serve che parta da 0 perché gli n0 li ha già calcolati
+            m = k-j;
+            rho_nm = conj(alpha(j,j-m))/((-1)^(n+m)*alpha(j,(j+m)) + eps);
             delta_nm = abs(log(abs(rho_nm) + eps));
-            b= 2*abs(alpha(j,j+k))*abs(alpha(j,j-k))/((abs(alpha(j,j+k)))^2 + (abs(alpha(j,j-k)))^2 + eps);
+            b = 2*abs(alpha(j,j+m))*abs(alpha(j,j-m))/((abs(alpha(j,j+m)))^2 + (abs(alpha(j,j-m)))^2 + eps);
             w_nm(j,k) = b/(1+delta_nm);
-            phi_nm_cand(j,k) = -1/2*angle(rho_nm);
+            phi_nm_cand(j,k) = -(1/2)*angle(rho_nm);
             n1 = wrapToPi(phi_nm_cand(j,k) - phi_0_cand);
-            n2 = wrapToPi(phi_nm_cand(j,k) + pi - phi_0_cand);;
+            n2 = wrapToPi(phi_nm_cand(j,k) + pi - phi_0_cand);
             if abs(n1) > abs(n2)
                 phi_nm_cand(j,k) = phi_nm_cand(j,k) + pi;
             end
@@ -67,14 +71,16 @@ function [S_hat, G_sym, G_norm, G_phase, G_tot, G_tot_glob] = PCM_per_bin(alpha,
     end
     
     for j=1:N_sup+1
-        w_n0(j) = abs(alpha(j,j))/(sum(diag(abs(alpha))) + eps)*(cos(delta(j)))^2;
+        w_n0(j) = (abs(alpha(j,j))/(sum(abs(diag(alpha))) + eps))*(cos(delta_n0(j)))^2;
     end
     
     sum_n0 = sum(w_n0(:) .* exp(1i * phi_n0_cand(:)));
     sum_nm = 0;
     for j = 2:N_sup+1
-        for k = 1:(j-1)
-            sum_nm = sum_nm + w_nm(j, k) * exp(1i * phi_nm_cand(j, k));
+        n = j-1;
+        for k = 1:j
+            m = k-j;
+            sum_nm = sum_nm + w_nm(j,k) * exp(1i * phi_nm_cand(j,k));
         end
     end
     
@@ -101,30 +107,26 @@ function [S_hat, G_sym, G_norm, G_phase, G_tot, G_tot_glob] = PCM_per_bin(alpha,
     G_tot = zeros(1,N_sup+1);
     
     for j=1:N_sup+1
-        n = j - 1;
+        n = j-1;
+        e_norm(j) = abs(alpha_norm(j) / ((S_hat_mod + eps)*sqrt(4*pi*(2*n+1))) - 1);
+        G_norm(j) = exp(-eta*e_norm(j));
+        n1 = wrapToPi(angle(d_hat(j,j)) - n*pi/2);
+        n2 = wrapToPi(angle(d_hat(j,j)) - pi - n*pi/2);
+        e_phase(j) = (2/pi) * min(abs(n1), abs(n2));
+        G_phase(j) = exp(-eta*e_phase(j));
         if n > 0
             sum_num = 0;
             sum_den = 0;
-            for m = 1:n
-                idx_neg = j - m;
-                idx_pos = j + m;
-                sum_num = sum_num + abs(d_hat(j, idx_neg) - (-1)^(n+m) * conj(d_hat(j, idx_pos)));
-                sum_den = sum_den + abs(d_hat(j, idx_neg)) + abs(d_hat(j, idx_pos));
+            for k = 1:j
+                m = k-j;
+                sum_num = sum_num + abs(d_hat(j, j-m) - (-1)^(n+m) * conj(d_hat(j, j+m)));
+                sum_den = sum_den + abs(d_hat(j, j-m)) + abs(d_hat(j, j+m));
             end
             e_sym(j) = sum_num / (sum_den + eps);
+            G_sym(j) = exp(-eta*e_sym(j));
         else
             e_sym(j) = 0;
         end
-    
-        G_sym(j) = exp(-eta*e_sym(j));
-    
-        e_norm(j) = abs(alpha_norm(j) / ((S_hat_mod + eps)*sqrt(4*pi*(2*n+1))) - 1);
-        G_norm(j) = exp(-eta*e_norm(j));
-    
-        n1 = wrapToPi(angle(d_hat(j,j)) - n*pi/2);
-        n2 = wrapToPi(angle(d_hat(j,j)) + pi - n*pi/2);
-        e_phase(j) = 2/pi * min(abs(n1), abs(n2));
-        G_phase(j) = exp(-eta*e_phase(j));
     
         G_tot(j) = G_sym(j).*G_norm(j).*G_phase(j);
     end

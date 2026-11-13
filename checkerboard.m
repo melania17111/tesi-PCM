@@ -16,12 +16,12 @@ phi2 = -pi/3;
 theta1 = pi/4;
 phi1 = pi;
 T = linspace(0, 180, 181);
-F = linspace(100, 5000, 200);
+F = linspace(100, 4000, 100);
 
 %% alpha
 
 alpha = zeros(length(F), length(T), M);
-
+correct = 0;
 for i=1:length(F)
     S_mag = 1;
     S1_phase = 2*pi*rand;
@@ -31,7 +31,9 @@ for i=1:length(F)
     S2 = S_mag*exp(1i*S2_phase);
     S3 = S_mag*exp(1i*S3_phase);
     for j=1:length(T)
-        if T(j)<=60
+        if T(j)< 20
+            alpha(i,j,:) = 0;
+        elseif T(j)<=60
             alpha(i,j,:) = reshape(S1.*compute_d_plane(N_max,theta1,phi1), 1, 1, []);
         elseif T(j)<=120
             alpha(i,j,:) = reshape((S1.*compute_d_plane(N_max, theta1, phi1) + S2.*compute_d_plane(N_max, theta2, phi2))/sqrt(2), 1, 1, []);
@@ -68,7 +70,7 @@ for i=1:length(F)
             alpha_mat_per_bin = alpha_vector_to_matrix(alpha_per_bin, N_sup);
             fprintf("tempo")
             disp(T(j))
-            [~, G1, G2, G3, G4, G5] = PCM_per_bin(alpha_mat_per_bin, N_sup, eta);
+            [~, G1, G2, G3, G4, G5] = PCM_per_bin(alpha_mat_per_bin, N_sup, eta, correct);
     
             G_sym(i,j,1:numel(G1))  = reshape(G1, 1, 1, []);
             G_norm(i,j,1:numel(G2)) = reshape(G2, 1, 1, []);
@@ -83,16 +85,13 @@ end
 figure(2)
 for i=1:N_max+1
     subplot(2,2,i)
-    imagesc(20*log10(G_tot(:,:,i)));
+    imagesc(20*log10(G_sym(:,:,i)));
     axis xy;
     clim([-20 0])
     xlabel('T'); ylabel('F');
     colorbar;
 end
-sgtitle('G_{tot} for 1, 2 and 3 plane waves');
-
-% le differenze tra la prima sezione (0<t<60) e le altre due ci sono ma non sono
-% così nette come mi aspetterei
+sgtitle('G_{sym} for 1, 2 and 3 plane waves');
 
 %%
 figure(3)

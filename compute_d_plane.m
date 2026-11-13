@@ -16,6 +16,8 @@ for n = 0:N_max
         if m<0
             Ynm = (-1)^m*conj(Ynm);
         end
+        %Ynm = harmonicY(n, m, theta, phi, 'type', 'complex', 'phase', false);
+
         dnm = 4*pi*(1i^n)*conj(Ynm);
         idx = idx + 1;
         d_plane(idx) = dnm;

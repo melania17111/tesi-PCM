@@ -1,12 +1,12 @@
 % to be given: input signal, N_sup, eta
 
-%% usare angle
+%% 
 % dataset di 50 stanze, snr sempre 40, cambiano dimensioni, assorbimento e
 % posizione di microfono e sorgente
 
 %%
-filename = 'dataset_stanze_ottimizzato.h5';
-room_idx = 0; % indice della stanza da analizzare
+filename = 'dataset_50_rooms.h5';
+room_idx = 14; % indice della stanza da analizzare
 group_path = sprintf('/room_%d', room_idx);
 
 raw_rirs = h5read(filename, [group_path '/rirs']);
@@ -28,7 +28,7 @@ c = 343;
 %%
 %SNR = snr_db;
 N_max = 3;
-eta = 1;
+eta = 2;
 r = 0.04;
 fs = double(fs);
 [source, fs_s] = audioread('LJ001-0001.wav'); %speech
@@ -38,11 +38,12 @@ source = resample(source, p, q);
 source = source/(max(source));
 [alpha, F, T] = compute_alpha(hoa_rirs, source, fs, N_max);
 M = (N_max+1)^2;
+correct = 1;
 
 %%
 nfft = 512;
-audio = istft(alpha(:,:,1), fs, 'Window', hann(nfft), ...
-    'OverlapLength', nfft/2, 'FrequencyRange', 'onesided');
+audio = real(istft(alpha(:,:,1), fs, 'Window', hann(nfft), ...
+    'OverlapLength', nfft/2, 'FrequencyRange', 'onesided'));
 
 plot(audio)
 %% e poi
@@ -52,20 +53,24 @@ G_norm = zeros(length(F),length(T), N_max+1);
 G_phase = zeros(length(F),length(T), N_max+1);
 G_tot = zeros(length(F),length(T), N_max+1);
 G_tot_glob = zeros(length(F),length(T));
-alpha_mat_per_bin = zeros(N_max+1, 2*N_max+1);
+alpha_mat_per_bin = zeros(length(F), length(T), N_max+1, 2*N_max+1);
 alpha_per_bin = zeros(1, (N_max+1)^2);
 % F x T x M
+
 
 % per TF bin now
 for i=1:length(F)
     N_sup = min(N_max, floor(2*pi*r*F(i)/c));
-    %fprintf("check: N_sup nel main")
-    %disp(N_sup)
+    
     for j=1:length(T)
         alpha_per_bin = reshape(alpha(i,j,:), 1, []);
         alpha_mat_per_bin = alpha_vector_to_matrix(alpha_per_bin, N_sup);
-        
-        [~, G1, G2, G3, G4, G5] = PCM_per_bin(alpha_mat_per_bin, N_sup, eta);
+        if correct == 1
+            alpha_mat_per_bin_complex = alpha_real_to_complex(alpha_mat_per_bin, N_sup);
+        else
+            alpha_mat_per_bin_complex = alpha_mat_per_bin;
+        end
+        [~, G1, G2, G3, G4, G5] = PCM_per_bin(alpha_mat_per_bin_complex, N_sup, eta, correct);
 
         G_sym(i,j,1:numel(G1))  = reshape(G1, 1, 1, []);
         G_norm(i,j,1:numel(G2)) = reshape(G2, 1, 1, []);
@@ -74,7 +79,6 @@ for i=1:length(F)
         G_tot_glob(i,j) = G5;
     end
 end
-
 %% check
 
 RES = [50 50];
@@ -117,7 +121,6 @@ E_tot = reshape(E_tot_flat, length(theta), length(phi));
 
 figure(7)
 E_tot_norm = E_tot / max(E_tot(:));
-%E_tot_norm = E_tot;
 plot3dBalloon(E_tot_norm, phi*180/pi, elev*180/pi, positions, 'Xlim', [0 room_dim(1)], 'Ylim', [0 room_dim(2)], 'Zlim', [0 room_dim(3)])
 hold on
 scatter3(source_pos(1), source_pos(2), source_pos(3), '*')
@@ -127,23 +130,23 @@ scatter3(source_pos(1), source_pos(2), source_pos(3), '*')
 figure(2)
 for i=1:N_max+1
     subplot(sqrt(N_max+1),sqrt(N_max+1),i)
-    imagesc(T(1:end), F(1:end), 20*log10(G_norm(:,:,i)));
+    imagesc(T(1:end), F(1:end), 20*log10(G_sym(:,:,i)));
     axis xy;
-    clim([-10, 0])
+    clim([-20, 0])
     xlabel('T'); ylabel('F');
-    colorbar; title('G_{tot}');
+    colorbar; title('G');
 end
 
-% g sym 1 è al contrario
-% g phase non si capisce niente
-% g norm confuso
+% g norm droppa un sacco quando la stanza non è anecoica
+% g sym molto buono
+% g phase circa
 
 %% plot G glob e confronto con spettrogramma sorgente
 figure(8)
 x1 = subplot(2,1,1);
 imagesc(T(1:end), F(1:end), 20*log10(G_tot_glob));
 axis xy;
-clim([-50 0])
+clim([-30 0])
 xlabel('T'); ylabel('F');
 %colorbar;
 title('G_{tot glob}');

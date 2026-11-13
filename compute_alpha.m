@@ -5,7 +5,6 @@ function [alpha, F, T] = compute_alpha(h_single, source, fs, N_max)
 M = (N_max+1)^2;
 nfft = 512;
 source = source(:);
-
 num_samples = length(source) + size(h_single,1) - 1;
 x_hoa = zeros(num_samples, M);
 
